@@ -12,7 +12,7 @@ sock.connect(server_address)
 try:
 
     # Send data
-    message = """GET /tutorials/other/top-20-mysql-best-practices/ HTTP/1.1
+    message = """GET /resource?sendip=55.66.77.88&sendport=6788&ttl=5&id=wqeqwe23&noask=11.22.33.44_345&noask=111.222.333.444_223 HTTP/1.1
 Host: net.tutsplus.com
 User-Agent: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.5) Gecko/20091102 Firefox/3.5.5 (.NET CLR 3.5.30729)
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
