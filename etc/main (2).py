@@ -182,7 +182,7 @@ class Server:
         # TODO bonus for thinking: use datastructure for optimal result. (YAGNI?)
 
         #things to avoid: duplicate ids
-            for  
+            for
         pass
 
     def sendMasterResourceRequest(self, ttl, id):
