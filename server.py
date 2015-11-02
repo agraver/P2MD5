@@ -12,7 +12,7 @@ class Server:
         self.ip_address = '127.0.0.1'
         self.port = port
         self.sock = None
-        self.resource = {"available": True, "amount": 100}
+        self.resource = {"available": True, "amount": 100} #TODO
         self.computers = []
         self.crack_tasks = []
 
@@ -67,7 +67,7 @@ class Server:
 
                 # print >>sys.stderr, '>>> the whole data >>>', request_header
                 parse_result = self.parseRequestHeader(request_header)
-                print >>sys.stderr, '>>> parse_result >>>', parse_result
+                print >>sys.stderr, '>>> Header parse_result same as query_data>>>', parse_result
                 self.handleRequest(parse_result)
             except:
                 print >>sys.stderr, "An error has occured while listening." , sys.exc_info()
@@ -128,7 +128,6 @@ class Server:
             if command == "/resourcereply":
                 print "Means I received the request!!"
 
-                pass
             if command == "/checkmd5": pass
             if command == "/answermd5": pass
 
@@ -149,15 +148,18 @@ class Server:
         print "url:", url
         print "data:", data
         req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
-        print "made the motherfucking request"
+        print "made the request"
         response_stream = urllib2.urlopen(req)
-        print "opened the motherfucker"
+        print "opened the request"
         response_stream.close()
-        print "closed the motherfucker"
+        print "closed the request"
 
-    def sendResourceRequestToOthers(self):
+    def sendResourceRequestToOthers(self, url):
         # Gather your brothers from the "machines.txt" file and ask them to ask their brothers
         # To join in a common effort with the master P2MD5 machine.
+
+        #Hell yeah I am back to save this empty space from it's frustrating existance.
+        #Lets start from a variable that goes inside the function itself.
 
         # this is a modified with noask parameter version of the original MasterResourceRequest
         pass
@@ -209,10 +211,17 @@ class Server:
         command       '/resource'
         params        {'noask': ['11.22.33.44_345', '111.222.333.444_223'], 'sendip': ['55.66.77.88'], 'id': ['wqeqwe23'], 'sendport': ['6788'], 'ttl': ['5']}
         """
+        print request_header
+
+        # GET REQUEST
         lines = request_header.splitlines()
         first_line = lines[0]
         method, path, version = first_line.split()
         command, params = self.parsePath(path)
+
+        # POST REQUEST
+        data = None
+
         return method, command, params
 
     def parsePath(self, path):

@@ -11,9 +11,9 @@ class Computer:
         self.ip_address = ip_address
         self.port = port
         # Not important for slaves, Master deals with it
-        self.resource_response = None
-        self.task_to_solve = None
-        self.work_response = None
+        self.resource_response = None ## arvut
+        self.task_to_solve = None ## tulevikuks
+        self.work_response = None ## tulevikuks
 
 
     def prepareResourceRequestUrl(self, sendip, sendport, ttl, task_id, noask):
