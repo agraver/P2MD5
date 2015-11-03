@@ -108,6 +108,11 @@ class Server:
                 task_id = params['id'][0]
                 sendip = params['sendip'][0]
                 sendport = params['sendport'][0]
+                ttl = params['ttl'][0]
+                try:
+                    noask = params['noask']
+                except Exception as e:
+                    noask = []
 
                 if self.checkResourceAvailable():
                     resource = self.getResourceAmount()
@@ -117,9 +122,13 @@ class Server:
                 print "sendip:", sendip, "sendport:", sendport, "task_id:", task_id, "resource:", resource
                 self.sendResourceReply(sendip, sendport, task_id, resource)
 
-                # Next step (later) would be sending out requests to all the machines
+                # Next step would be sending out requests to all the machines
                 # that I, myself, as a Server, know from "machines.txt" file.
-                self.sendResourceRequestToOthers() # TODO solve the noask part here
+                if ttl > 0:
+                    print "Sending out requests to minions"
+                    self.sendResourceRequestToOthers(task_id, sendip, sendport, ttl, noask)
+                else:
+                    print "ttl has been exhausted. Resource request distribution has been terminated"
 
             if command == "/crack":
                 self.startCracking(params["md5"])
@@ -154,15 +163,20 @@ class Server:
         response_stream.close()
         print "closed the request"
 
-    def sendResourceRequestToOthers(self, url):
+    def sendResourceRequestToOthers(self, task_id, sendip, sendport, ttl, noask):
+        # this is a modified with noask parameter version of the original MasterResourceRequest
         # Gather your brothers from the "machines.txt" file and ask them to ask their brothers
         # To join in a common effort with the master P2MD5 machine.
 
-        #Hell yeah I am back to save this empty space from it's frustrating existance.
-        #Lets start from a variable that goes inside the function itself.
+        # Lower ttl count by 1
+        ttl = int(ttl) - 1
 
-        # this is a modified with noask parameter version of the original MasterResourceRequest
-        pass
+        # Add senders computers ip to noask list, so there would be no duplicate requests to this machine
+        noask.append("%s_%s" % (self.ip_address, self.port))
+
+        for computer in self.computers:
+            computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
+            print self.ip_address+" sent to " + computer.ip_address + ":" + computer.port
 
     def startCracking(self, md5):
         #Start with a resource request as the initiator, the legendary P2MD5 master machine
