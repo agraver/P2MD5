@@ -1,6 +1,6 @@
 import urllib, urllib2
 
-class Computer:
+class Computer(object):
     def __init__(self, ip_address, port):
         """Form a new known computer
 
@@ -10,10 +10,7 @@ class Computer:
         """
         self.ip_address = ip_address
         self.port = port
-        # Not important for slaves, Master deals with it
-        self.resource_response = None ## arvut
-        self.task_to_solve = None ## tulevikuks
-        self.work_response = None ## tulevikuks
+
 
 
     def prepareResourceRequestUrl(self, sendip, sendport, ttl, task_id, noask):
@@ -30,9 +27,6 @@ class Computer:
         url = self.prepareResourceRequestUrl(sendip, sendport, ttl, task_id, noask)
         print url
         response = urllib2.urlopen(url)
-        print response.info()
-        html = response.read()
-        print html
         # do something
         response.close()  # best practice to close the file
 

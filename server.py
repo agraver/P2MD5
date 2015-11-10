@@ -1,10 +1,12 @@
 from computer import Computer
 from crackTask import CrackTask
+from slaveComputer import SlaveComputer
 import urllib2
 from urlparse import urlparse, parse_qs
 import socket
 import json
 import sys
+import ast
 
 class Server:
     def __init__(self, port):
@@ -14,13 +16,17 @@ class Server:
         self.sock = None
         self.resource = {"available": True, "amount": 100} #TODO
         self.computers = []
+        self.slave_computers = []
         self.crack_tasks = []
 
     def addComputersFromMachinesTxt(self):
         try:
-            # input_file = open('machines.txt', 'r')
-            # machines = f.read()
-            machines = [["localhost", "10001"], ["127.0.0.1", "10002"], ["localhost", "10002"]]
+            filename = 'machines/machines%s.txt' % self.port
+            input_file = open(filename, 'r')
+            # Read string representitive of machine list.
+            machines = input_file.read()
+            # Parse string to list.
+            machines = ast.literal_eval(machines)
             computers = [Computer(machine[0], machine[1]) for machine in machines]
             self.addComputers(computers)
         finally:
@@ -135,7 +141,29 @@ class Server:
 
         if method == "POST":
             if command == "/resourcereply":
-                print "Means I received the request!!"
+                # TODO Save resourcereply POST data to self.computers.
+                ip = params['ip']
+                resource = params['resource']
+                port = str(params['port'])
+                id = params['id']
+                for computer in self.computers:
+                    if computer.port == port:
+                        computer.resource_response = resource
+                        computer = SlaveComputer(computer, resource)
+                        self.slave_computers.append(computer)
+                        break
+                else:
+                    computer = Computer(ip, port)
+                    computer.resource_response = resource
+                    computer = SlaveComputer(computer, resource)
+                    self.slave_computers.append(computer)
+
+                print "Computers from machines.txt"
+                for c in self.computers:
+                    print c.__str__()
+                print "Slave computers"
+                for c in self.slave_computers:
+                    print c.__str__()
 
             if command == "/checkmd5": pass
             if command == "/answermd5": pass
@@ -209,7 +237,6 @@ class Server:
         noask = []
         for computer in self.computers:
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
-        #TODO implement sendResourceRequest(sendip, sendport, ttl, id, noask)
 
     def generateId(self, md5):
         #assume md5 is a string
@@ -234,8 +261,11 @@ class Server:
         command, params = self.parsePath(path)
 
         # POST REQUEST
-        data = None
-
+        if method == "POST":
+            # Its a json string inside the list
+            posted_data_string = lines[-1:][0]
+            params = json.loads(posted_data_string)
+            print "Parsed data is ", params
         return method, command, params
 
     def parsePath(self, path):

@@ -116,7 +116,8 @@ class Server:
                 self.startCracking(params["md5"])
 
         if method == "POST":
-            if command == "resourcereply": pass
+            if command == "resourcereply":
+                print "Now I would like to get the data pls"
             if command == "checkmd5": pass
             if command == "answermd5": pass
 
