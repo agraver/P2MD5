@@ -185,8 +185,11 @@ class Server:
         # Gather your brothers from the "machines.txt" file and ask them to ask their brothers
         # To join in a common effort with the master P2MD5 machine.
 
-        # Lower ttl count by 1
-        ttl = int(ttl) - 1
+        if ttl <= 0:
+            return None
+        else:
+            # Lower ttl count by 1
+            ttl = int(ttl) - 1
 
         # Add senders computers ip to noask list, so there would be no duplicate requests to this machine
         computer_address = "%s_%s" % (self.ip_address, self.port)
