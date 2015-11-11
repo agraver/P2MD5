@@ -1,11 +1,14 @@
 from computer import Computer
 from crackTask import CrackTask
 from slaveComputer import SlaveComputer
+from multiprocessing import Process
+from action import Action
 import urllib2
 from urlparse import urlparse, parse_qs
 import socket
 import json
 import sys
+import time
 import ast
 
 class Server:
@@ -15,9 +18,19 @@ class Server:
         self.port = port
         self.sock = None
         self.resource = {"available": True, "amount": 100} #TODO
-        self.computers = []
-        self.slave_computers = []
-        self.crack_tasks = []
+
+        # {'<ip>_<port>':<Computer>}
+        self.known_computers = {}
+        # {'crack_task_id':<CrackTask>}
+        self.crack_tasks = {}
+        # Set of task ids, which I have already sent a resourcereply
+        self.responded_task_ids = set()
+        # {'<ip>_<port>'}
+        self.responded_computers = set()
+        # Commands: resource[GET], resourcereply[POST], checkmd5[POST], answermd5[POST], crack[GET]
+        # Action handlers. Usage: self.handle.<command>(params)
+        self.handle = Action()
+        self.addComputersFromMachinesTxt()
 
     def addComputersFromMachinesTxt(self):
         try:
@@ -42,8 +55,11 @@ class Server:
             None
         """
         for computer in computers:
-            if computer not in self.computers:
-                self.computers.append(computer)
+            ip = computer.ip_address
+            port = computer.port
+            key = "%s_%s" % (ip, port)
+            if key not in self.known_computers.keys():
+                self.known_computers[key] = computer
         return None
 
     def boot(self):
@@ -74,6 +90,8 @@ class Server:
                 # print >>sys.stderr, '>>> the whole data >>>', request_header
                 parse_result = self.parseRequestHeader(request_header)
                 print >>sys.stderr, '>>> Header parse_result same as query_data>>>', parse_result
+
+
                 self.handleRequest(parse_result)
             except:
                 print >>sys.stderr, "An error has occured while listening." , sys.exc_info()
@@ -93,7 +111,7 @@ class Server:
         ## params:
         ##    resource:[sendip,sendport,ttl,id,noask]
         ##    resourcereply:[ip, port, id, resource=100]
-        ##    checkmd:[ip, port, id, md5, ranges, wildcard, symbolrange]
+        ##    checkmd5:[ip, port, id, md5, ranges, wildcard, symbolrange]
         ##        ranges: ["ax?o?ssss","aa","ab","ac","ad"]
         ##        wildcard: "?"
         ##        symbolrange: [[3,10],[100,150]]
@@ -102,71 +120,31 @@ class Server:
         ##        resultString: saosdooe
         ##    crack:[md5]
 
-        #TODO
         if method == "GET":
             print "GET branch"
+            # Master -> Slave
             if command == "/resource":
-                print "resource branch"
-                # Do what computers do when they recieve a resource request
-                # Like check if they have another process already running and
-                # reply to the person of interest defined inside "sendip", "sendport"
-                # variables
-                task_id = params['id'][0]
-                sendip = params['sendip'][0]
-                sendport = params['sendport'][0]
-                ttl = params['ttl'][0]
-                try:
-                    noask = params['noask']
-                except Exception as e:
-                    noask = []
-
-                if self.checkResourceAvailable():
-                    resource = self.getResourceAmount()
-                else:
-                    resource = 0
-
-                print "sendip:", sendip, "sendport:", sendport, "task_id:", task_id, "resource:", resource
-                self.sendResourceReply(sendip, sendport, task_id, resource)
-
-                # Next step would be sending out requests to all the machines
-                # that I, myself, as a Server, know from "machines.txt" file.
-                if ttl > 0:
-                    print "Sending out requests to minions"
-                    self.sendResourceRequestToOthers(task_id, sendip, sendport, ttl, noask)
-                else:
-                    print "ttl has been exhausted. Resource request distribution has been terminated"
-
+                self.handle.resource(self, params)
+            # Master -> Slave
             if command == "/crack":
-                self.startCracking(params["md5"])
+                self.handle.crack(self, params)
 
         if method == "POST":
+            # Slave -> Master
             if command == "/resourcereply":
-                # TODO Save resourcereply POST data to self.computers.
-                ip = params['ip']
-                resource = params['resource']
-                port = str(params['port'])
-                id = params['id']
-                for computer in self.computers:
-                    if computer.port == port:
-                        computer.resource_response = resource
-                        computer = SlaveComputer(computer, resource)
-                        self.slave_computers.append(computer)
-                        break
-                else:
-                    computer = Computer(ip, port)
-                    computer.resource_response = resource
-                    computer = SlaveComputer(computer, resource)
-                    self.slave_computers.append(computer)
+                self.handle.resourcereply(self, params)
+                # Just print out all crack_tasks
+                for crack_task in self.crack_tasks.values():
+                    print "Task %s has:" % str(crack_task.task_id)
+                    for slave in crack_task.slave_computers.values():
+                        print "    %s"%str(slave)
 
-                print "Computers from machines.txt"
-                for c in self.computers:
-                    print c.__str__()
-                print "Slave computers"
-                for c in self.slave_computers:
-                    print c.__str__()
-
-            if command == "/checkmd5": pass
-            if command == "/answermd5": pass
+            # Master -> Slave
+            if command == "/checkmd5":
+                self.handle.checkmd5(self, params)
+            # Slave -> Master
+            if command == "/answermd5":
+                self.handle.answermd5(self, params)
 
     def checkResourceAvailable(self):
         return self.resource['available']
@@ -184,12 +162,23 @@ class Server:
         data = json.dumps({"ip":ip_address, "port":port, "id":task_id, "resource":resource})
         print "url:", url
         print "data:", data
-        req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
         print "made the request"
-        response_stream = urllib2.urlopen(req)
-        print "opened the request"
-        response_stream.close()
-        print "closed the request"
+        try:
+            req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
+            response_stream = urllib2.urlopen(req).read()
+            print "opened the request"
+            response_stream.close()
+            print "closed the request"
+        except urllib2.HTTPError, err:
+            if err.code == 404:
+                print "Page not found!"
+            elif err.code == 403:
+                print "Access denied!"
+            else:
+                print "Something happened! Error code", err.code
+        except urllib2.URLError, err:
+            print "Some other error happened:", err.reason
+
 
     def sendResourceRequestToOthers(self, task_id, sendip, sendport, ttl, noask):
         # this is a modified with noask parameter version of the original MasterResourceRequest
@@ -200,42 +189,50 @@ class Server:
         ttl = int(ttl) - 1
 
         # Add senders computers ip to noask list, so there would be no duplicate requests to this machine
-        noask.append("%s_%s" % (self.ip_address, self.port))
+        computer_address = "%s_%s" % (self.ip_address, self.port)
+        if computer_address not in noask:
+            noask.append(computer_address)
 
-        for computer in self.computers:
+        for computer in self.known_computers.values():
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
             print self.ip_address+" sent to " + computer.ip_address + ":" + computer.port
+
+    def f(self, arg):
+        print "Going to sleep for 5 sec... " + arg
+        time.sleep(1)
+        print "4"
+        time.sleep(1)
+        print "3"
+        time.sleep(1)
+        print "2"
+        time.sleep(1)
+        print "1"
+        time.sleep(1)
+        print "Should send out checkmd5 request now", self.crack_tasks
 
     def startCracking(self, md5):
         #Start with a resource request as the initiator, the legendary P2MD5 master machine
         #Prepare the request, params needed: ttl
         task_id = self.generateId(md5)
-        task = CrackTask(task_id, md5, self.ip_address, self.port)
-        self.addcrackTaskToList(task)
+        task = CrackTask(task_id)
         ttl = 5
         self.sendMasterResourceRequest(ttl, task_id)
+        """
+        t1 = Process(target=self.f, args=('bob',))
+        t2 = Process(target=self.sendMasterResourceRequest, args=(ttl, task_id,))
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+        """
         #TODO wait for some time to collect responses and divide the task between servant machines.
-        pass
-
-    def addcrackTaskToList(self, crack_task):
-        # TODO should be a function to add crackTasks as to update with received ones and
-        # avoid something that might override the wrong way or duplicate.
-
-        # TODO bonus for thinking: use datastructure for optimal result. (YAGNI?)
-
-        #things to avoid: duplicate ids
-        for task in self.crack_tasks:
-            if crack_task.id == task.id:
-                pass
-                #case to check if needs update, ie contains answer inside.
-                #but!! crackTask were meant to be with the same id but different
-                #divisions of the same task ie Ranges and
+        #TODO use self.slave_computers
 
     def sendMasterResourceRequest(self, ttl, task_id):
         sendip = self.ip_address
         sendport = self.port
         noask = []
-        for computer in self.computers:
+        for computer in self.known_computers.values():
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
 
     def generateId(self, md5):
@@ -275,3 +272,6 @@ class Server:
 
     def close(self):
         pass
+
+    def __str__(self):
+        return self.ip_address + '_' + str(self.port)

@@ -3,12 +3,17 @@ import sys
 
 def main():
 
-    if len(sys.argv) == 2:
+    arg_count = len(sys.argv)
+
+    if arg_count in [2, 3]:
         machine = Server(int(sys.argv[1]))
         machine.addComputersFromMachinesTxt()
         machine.boot()
-        machine.listen()
-        # Master send resource request
+        if arg_count == 3 and sys.argv[2].lower() == 'master':
+            machine.startCracking("lambi")
+        else:
+            machine.listen()
+
     else:
         print "This program is used: main.py <port> (<master>)"
 
