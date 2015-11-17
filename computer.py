@@ -27,8 +27,9 @@ class Computer(object):
         url = self.prepareResourceRequestUrl(sendip, sendport, ttl, task_id, noask)
         print url
         response = urllib2.urlopen(url)
-        # do something
+        print "opened the url"
         response.close()  # best practice to close the file
+        print "closed the response"
 
     def __str__(self):
         return "my ip is: %s, port: %s" %(self.ip_address, self.port)

@@ -18,18 +18,17 @@ class Server:
         self.port = port
         self.sock = None
         self.resource = {"available": True, "amount": 100} #TODO
+        self.known_computers = {} # {'<ip>_<port>':<Computer>}
+        self.crack_tasks = {} # {'crack_task_id':<CrackTask>}
 
-        # {'<ip>_<port>':<Computer>}
-        self.known_computers = {}
-        # {'crack_task_id':<CrackTask>}
-        self.crack_tasks = {}
         # Set of task ids, which I have already sent a resourcereply
-        self.responded_task_ids = set()
-        # {'<ip>_<port>'}
-        self.responded_computers = set()
+        self.responded_task_ids = set()  # {'<task_id>'}
+        self.responded_computers = set() # {'<ip>_<port>'}
+
         # Commands: resource[GET], resourcereply[POST], checkmd5[POST], answermd5[POST], crack[GET]
         # Action handlers. Usage: self.handle.<command>(params)
         self.handle = Action()
+
         self.addComputersFromMachinesTxt()
 
     def addComputersFromMachinesTxt(self):
@@ -65,41 +64,34 @@ class Server:
     def boot(self):
         self.address = (self.ip_address, self.port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        #self.sock.settimeout(1) #just times out in a second after opening the socket
         self.sock.bind(self.address)
         return None
 
     def listen(self):
-        self.sock.listen(1)
+        self.sock.listen(10)
         while True:
-            # Wait for a connection
             print >>sys.stderr, 'waiting for a connection'
             connection, client_address = self.sock.accept()
+            # TODO we need threads after sock.accept()
+            # http://www.binarytides.com/python-socket-programming-tutorial/
+            # http://stackoverflow.com/questions/15869158/python-socket-listening
             try:
                 print >>sys.stderr, 'connection from', client_address
-                # Receive the data in small chunks and retransmit it
                 request_header = ""
-                while True:
-                    data = connection.recv(32)
-                    if data:
-                        request_header += data
-                        #TODO understand why socket doesn't work without this
-                        connection.sendall(data)
-                    else:
-                        break
+                data = connection.recv(4096)
+                request_header += data
+                connection.sendall(data)
+                connection.close()
 
-                # print >>sys.stderr, '>>> the whole data >>>', request_header
                 parse_result = self.parseRequestHeader(request_header)
-                print >>sys.stderr, '>>> Header parse_result same as query_data>>>', parse_result
-
-
-                self.handleRequest(parse_result)
+                print >>sys.stderr, '>>> Header parse_result (same as query_data) >>>', parse_result
+                # TODO: need to use threading here
+                # https://pymotw.com/2/threading/
+                self.handleRequest(parse_result) # may get stuck up in here?
             except:
                 print >>sys.stderr, "An error has occured while listening." , sys.exc_info()
-
-            finally:
-                # Clean up the connection
-                print "I closed the connection, yeeah."
-                connection.close()
 
         return None
 
@@ -133,11 +125,6 @@ class Server:
             # Slave -> Master
             if command == "/resourcereply":
                 self.handle.resourcereply(self, params)
-                # Just print out all crack_tasks
-                for crack_task in self.crack_tasks.values():
-                    print "Task %s has:" % str(crack_task.task_id)
-                    for slave in crack_task.slave_computers.values():
-                        print "    %s"%str(slave)
 
             # Master -> Slave
             if command == "/checkmd5":
@@ -162,22 +149,15 @@ class Server:
         data = json.dumps({"ip":ip_address, "port":port, "id":task_id, "resource":resource})
         print "url:", url
         print "data:", data
-        print "made the request"
+        print "sent the resourceReply"
         try:
             req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
-            response_stream = urllib2.urlopen(req).read()
-            print "opened the request"
+            response_stream = urllib2.urlopen(req)
             response_stream.close()
-            print "closed the request"
         except urllib2.HTTPError, err:
-            if err.code == 404:
-                print "Page not found!"
-            elif err.code == 403:
-                print "Access denied!"
-            else:
-                print "Something happened! Error code", err.code
+            print "HTTPError", err.code
         except urllib2.URLError, err:
-            print "Some other error happened:", err.reason
+            print "URLError", err.reason
 
 
     def sendResourceRequestToOthers(self, task_id, sendip, sendport, ttl, noask):
@@ -185,11 +165,11 @@ class Server:
         # Gather your brothers from the "machines.txt" file and ask them to ask their brothers
         # To join in a common effort with the master P2MD5 machine.
 
-        if ttl <= 0:
+        ttl = int(ttl)
+        if ttl < 1:
             return None
         else:
-            # Lower ttl count by 1
-            ttl = int(ttl) - 1
+            ttl = ttl - 1
 
         # Add senders computers ip to noask list, so there would be no duplicate requests to this machine
         computer_address = "%s_%s" % (self.ip_address, self.port)
@@ -197,21 +177,11 @@ class Server:
             noask.append(computer_address)
 
         for computer in self.known_computers.values():
+            recepient_address = "%s_%s" % (computer.ip_address, computer.port)
+            if recepient_address in noask:
+                continue
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
-            print self.ip_address+" sent to " + computer.ip_address + ":" + computer.port
-
-    def f(self, arg):
-        print "Going to sleep for 5 sec... " + arg
-        time.sleep(1)
-        print "4"
-        time.sleep(1)
-        print "3"
-        time.sleep(1)
-        print "2"
-        time.sleep(1)
-        print "1"
-        time.sleep(1)
-        print "Should send out checkmd5 request now", self.crack_tasks
+            print self.ip_address+" sent ResourceRequest to " + computer.ip_address + ":" + computer.port
 
     def startCracking(self, md5):
         #Start with a resource request as the initiator, the legendary P2MD5 master machine
@@ -219,15 +189,17 @@ class Server:
         task_id = self.generateId(md5)
         task = CrackTask(task_id)
         ttl = 5
+        #TODO might need threading here
         self.sendMasterResourceRequest(ttl, task_id)
-        """
-        t1 = Process(target=self.f, args=('bob',))
-        t2 = Process(target=self.sendMasterResourceRequest, args=(ttl, task_id,))
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
-        """
+        print "HEEEEEEEEEEEEEELLLLOOO I AM HEEERE"
+        time.sleep(15) # wait for 5 seconds to collect responses...
+        # Just print out all crack_tasks
+        print "I've slept for 5 seconds"
+        crack_task = self.crack_tasks[task_id]
+        print "here's the result: "
+        print crack_task
+        # for slave in crack_task.slave_computers.values():
+        #     print "    %s"%str(slave)
         #TODO wait for some time to collect responses and divide the task between servant machines.
         #TODO use self.slave_computers
 

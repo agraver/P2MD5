@@ -70,9 +70,7 @@ class Action():
             crack_task = CrackTask(task_id)
             if task_id in server.crack_tasks.keys():
                 crack_task = server.crack_tasks[task_id]
-            print crack_task.__str__()
             crack_task.addSlave(slave_computer)
-            print crack_task.__str__()
             server.crack_tasks[task_id] = crack_task
 
 
@@ -83,4 +81,4 @@ class Action():
         pass
 
     def crack(self, server, params):
-        server.startCracking(params["md5"])
+        server.startCracking(params["md5"][0])

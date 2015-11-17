@@ -9,13 +9,10 @@ def main():
         machine = Server(int(sys.argv[1]))
         machine.addComputersFromMachinesTxt()
         machine.boot()
-        if arg_count == 3 and sys.argv[2].lower() == 'master':
-            machine.startCracking("lambi")
-        else:
-            machine.listen()
+        machine.listen()
 
     else:
-        print "This program is used: main.py <port> (<master>)"
+        print "Usage: python main.py <port>"
 
 
 if __name__== "__main__":
