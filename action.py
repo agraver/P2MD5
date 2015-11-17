@@ -66,12 +66,15 @@ class Action():
             # We create a MD5 computing slave_computer
             computer = Computer(ip, port)
             slave_computer = SlaveComputer(computer, resource)
-            # If we already have a crack_task with this id.
-            crack_task = CrackTask(task_id)
-            if task_id in server.crack_tasks.keys():
-                crack_task = server.crack_tasks[task_id]
+
+            if task_id not in server.crack_tasks.keys():
+                pass
+
+            crack_task = server.crack_tasks[task_id]
             crack_task.addSlave(slave_computer)
+            #update the crack_task object
             server.crack_tasks[task_id] = crack_task
+            #
 
 
     def checkmd5(self, server, params):

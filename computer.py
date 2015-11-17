@@ -26,7 +26,14 @@ class Computer(object):
     def sendResourceRequest(self, sendip, sendport, ttl, task_id, noask):
         url = self.prepareResourceRequestUrl(sendip, sendport, ttl, task_id, noask)
         print url
-        response = urllib2.urlopen(url)
+        print "i get stuck here"
+        try:
+            response = urllib2.urlopen(url)
+        except urllib2.URLError, e:
+            raise
+        except:
+            raise
+
         print "opened the url"
         response.close()  # best practice to close the file
         print "closed the response"

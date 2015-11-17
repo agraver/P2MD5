@@ -84,7 +84,6 @@ class Server:
                 request_header += data
                 connection.sendall(data)
                 connection.close()
-
                 parse_result = self.parseRequestHeader(request_header)
                 print >>sys.stderr, '>>> Header parse_result (same as query_data) >>>', parse_result
                 # TODO: need to use threading here
@@ -149,7 +148,7 @@ class Server:
         data = json.dumps({"ip":ip_address, "port":port, "id":task_id, "resource":resource})
         print "url:", url
         print "data:", data
-        print "sent the resourceReply"
+        print "next I'm going to send the resourceReply"
         try:
             req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
             response_stream = urllib2.urlopen(req)
@@ -158,6 +157,8 @@ class Server:
             print "HTTPError", err.code
         except urllib2.URLError, err:
             print "URLError", err.reason
+        except socket.timeout, e:
+            raise e
 
 
     def sendResourceRequestToOthers(self, task_id, sendip, sendport, ttl, noask):
@@ -188,13 +189,15 @@ class Server:
         #Prepare the request, params needed: ttl
         task_id = self.generateId(md5)
         task = CrackTask(task_id)
+        self.crack_tasks[task_id] = task
         ttl = 5
         #TODO might need threading here
         self.sendMasterResourceRequest(ttl, task_id)
-        print "HEEEEEEEEEEEEEELLLLOOO I AM HEEERE"
-        time.sleep(15) # wait for 5 seconds to collect responses...
-        # Just print out all crack_tasks
-        print "I've slept for 5 seconds"
+        print "self.sendMasterResourceRequest(ttl, task_id) successful"
+        # TODO wait until this crack_task ResourceRequest
+        # is complete (say lsiten for an event.. or sync threads) before
+        # trying to read the crack_task, which should be created
+        # as a response to one of the first incoming headers ???
         crack_task = self.crack_tasks[task_id]
         print "here's the result: "
         print crack_task
