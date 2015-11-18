@@ -8,7 +8,7 @@ from urlparse import urlparse, parse_qs
 import socket
 import json
 import sys
-import time
+import copy
 import ast
 
 class Server:
@@ -182,25 +182,25 @@ class Server:
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
             print self.ip_address+" sent ResourceRequest to " + computer.ip_address + ":" + computer.port
         print "sendResourceRequestToOthers() is complete"
+
     def startCracking(self, md5):
-        #Start with a resource request as the initiator, the legendary P2MD5 master machine
-        #Prepare the request, params needed: ttl
-        task_id = self.generateId(md5)
-        task = CrackTask(self.myself, task_id) #adding myself as the master computer to respond to through class methods.
+        task = CrackTask(self.myself, md5) #adding myself as the master computer to respond to through class methods.
+        task_id = task.task_id
         self.crack_tasks[task_id] = task
+
         ttl = 5
         self.sendMasterResourceRequest(ttl, task_id)
         print "self.sendMasterResourceRequest(ttl, task_id) successful"
+
         t = threading.Timer(5, self.printCrackTask, args=(task_id,))
         t.start()
-        # deep copy the crack_task (so that further unexpected changes cannot be made)
-        # take the crack_task and count computers
-        # divide the cracktask accordingly, compose all the strings
-        # send out the crack_task parts to the computers
-        # slaveComputers receive and start cracking on a separate thread
+        t.join() # wait until finished
 
-        #TODO divide the task between servant machines.
-        #TODO use self.slave_computers
+        task_deepcopy = copy.deepcopy(task)
+        t = threading.Thread(target=self.masterCrackTaskProcess, args=(task_deepcopy,))
+
+    def masterCrackTaskProcess(self, crackTask):
+        crackTask.solve()
 
     def printCrackTask(self, task_id):
         crack_task = self.crack_tasks[task_id]
@@ -216,10 +216,6 @@ class Server:
         for computer in self.known_computers.values():
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
 
-    def generateId(self, md5):
-        #assume md5 is a string
-        #TODO generate a more unique md5 identificator
-        return md5[:5] + "420"
 
     def parseRequestHeader(self, request_header):
         """
