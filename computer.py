@@ -23,6 +23,9 @@ class Computer(object):
     def sendCrackTask(self, CrackTask):
         pass
 
+    def replyWithProcessedCrackTask(self, CrackTask):
+        pass
+
     def sendResourceRequest(self, sendip, sendport, ttl, task_id, noask):
         url = self.prepareResourceRequestUrl(sendip, sendport, ttl, task_id, noask)
         print url

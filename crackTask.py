@@ -2,12 +2,13 @@ from computer import Computer
 from slaveComputer import SlaveComputer
 
 class CrackTask:
-    def __init__(self, task_id):
+    def __init__(self, master_computer, task_id):
         self.task_id = task_id
         self.answer = None
         self.ranges = None
         self.wildcard = None
         # {'<Key>':<SlaveComputer>}
+        self.master_computer = None
         self.slave_computers = {}
 
     def setMD5(self, md5):

@@ -14,10 +14,12 @@ import ast
 class Server:
     def __init__(self, port):
         #initiate a localhost server
+        #TODO refactor for deployment on different IPs
         self.ip_address = '127.0.0.1'
         self.port = port
         self.sock = None
         self.resource = {"available": True, "amount": 100} #TODO
+        self.myself = Computer(self.ip_address, self.port)
         self.known_computers = {} # {'<ip>_<port>':<Computer>}
         self.crack_tasks = {} # {'crack_task_id':<CrackTask>}
 
@@ -74,9 +76,6 @@ class Server:
         while True:
             print >>sys.stderr, 'waiting for a connection'
             connection, client_address = self.sock.accept()
-            # TODO we need threads after sock.accept()
-            # http://www.binarytides.com/python-socket-programming-tutorial/
-            # http://stackoverflow.com/questions/15869158/python-socket-listening
             try:
                 print >>sys.stderr, 'connection from', client_address
                 request_header = ""
@@ -187,22 +186,28 @@ class Server:
         #Start with a resource request as the initiator, the legendary P2MD5 master machine
         #Prepare the request, params needed: ttl
         task_id = self.generateId(md5)
-        task = CrackTask(task_id)
+        task = CrackTask(self.myself, task_id) #adding myself as the master computer to respond to through class methods.
         self.crack_tasks[task_id] = task
         ttl = 5
         self.sendMasterResourceRequest(ttl, task_id)
         print "self.sendMasterResourceRequest(ttl, task_id) successful"
-        # TODO wait until this crack_task ResourceRequest
-        # is complete (say lsiten for an event.. or sync threads) before
-        # trying to read the crack_task, which should be created
-        # as a response to one of the first incoming headers ???
+        t = threading.Timer(5, self.printCrackTask, args=(task_id,))
+        t.start()
+        # deep copy the crack_task (so that further unexpected changes cannot be made)
+        # take the crack_task and count computers
+        # divide the cracktask accordingly, compose all the strings
+        # send out the crack_task parts to the computers
+        # slaveComputers receive and start cracking on a separate thread
+
+        #TODO divide the task between servant machines.
+        #TODO use self.slave_computers
+
+    def printCrackTask(self, task_id):
         crack_task = self.crack_tasks[task_id]
         print "here's the result: "
         print crack_task
-        # for slave in crack_task.slave_computers.values():
-        #     print "    %s"%str(slave)
-        #TODO wait for some time to collect responses and divide the task between servant machines.
-        #TODO use self.slave_computers
+        for slave in crack_task.slave_computers.values():
+            print "    %s"%str(slave)
 
     def sendMasterResourceRequest(self, ttl, task_id):
         sendip = self.ip_address
