@@ -1,7 +1,7 @@
 from computer import Computer
 from crackTask import CrackTask
 from slaveComputer import SlaveComputer
-from multiprocessing import Process
+import threading
 from action import Action
 import urllib2
 from urlparse import urlparse, parse_qs
@@ -86,9 +86,8 @@ class Server:
                 connection.close()
                 parse_result = self.parseRequestHeader(request_header)
                 print >>sys.stderr, '>>> Header parse_result (same as query_data) >>>', parse_result
-                # TODO: need to use threading here
-                # https://pymotw.com/2/threading/
-                self.handleRequest(parse_result) # may get stuck up in here?
+                t = threading.Thread(target=self.handleRequest, args=(parse_result,))
+                t.start()
             except:
                 print >>sys.stderr, "An error has occured while listening." , sys.exc_info()
 
@@ -96,7 +95,7 @@ class Server:
 
     def handleRequest(self, query_data):
         method, command, params = query_data
-        print "inside handleRequest()"
+        print "inside handleRequest() thread version"
         ## methods: GET, POST
         ## commands: resource[GET], resourcereply[POST], checkmd5[POST], answermd5[POST], crack[GET]
         ## params:
@@ -165,7 +164,7 @@ class Server:
         # this is a modified with noask parameter version of the original MasterResourceRequest
         # Gather your brothers from the "machines.txt" file and ask them to ask their brothers
         # To join in a common effort with the master P2MD5 machine.
-
+        print "Inside sendResourceRequestToOthers()"
         ttl = int(ttl)
         if ttl < 1:
             return None
@@ -183,7 +182,7 @@ class Server:
                 continue
             computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
             print self.ip_address+" sent ResourceRequest to " + computer.ip_address + ":" + computer.port
-
+        print "sendResourceRequestToOthers() is complete"
     def startCracking(self, md5):
         #Start with a resource request as the initiator, the legendary P2MD5 master machine
         #Prepare the request, params needed: ttl
@@ -191,7 +190,6 @@ class Server:
         task = CrackTask(task_id)
         self.crack_tasks[task_id] = task
         ttl = 5
-        #TODO might need threading here
         self.sendMasterResourceRequest(ttl, task_id)
         print "self.sendMasterResourceRequest(ttl, task_id) successful"
         # TODO wait until this crack_task ResourceRequest

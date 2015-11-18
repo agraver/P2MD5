@@ -74,7 +74,7 @@ class Action():
             crack_task.addSlave(slave_computer)
             #update the crack_task object
             server.crack_tasks[task_id] = crack_task
-            #
+            #print crack_task
 
 
     def checkmd5(self, server, params):
