@@ -197,9 +197,12 @@ class Server:
         t.join() # wait until finished
 
         task_deepcopy = copy.deepcopy(task)
+        print "made the deepcopy"
         t = threading.Thread(target=self.masterCrackTaskProcess, args=(task_deepcopy,))
+        t.start()
 
     def masterCrackTaskProcess(self, crackTask):
+        print "inside masterCrackTaskProcess()"
         crackTask.solve()
 
     def printCrackTask(self, task_id):
