@@ -1,4 +1,4 @@
-import urllib, urllib2
+import json, urllib, urllib2
 
 class Computer(object):
     def __init__(self, ip_address, port):
@@ -11,7 +11,15 @@ class Computer(object):
         self.ip_address = ip_address
         self.port = port
 
-
+    def sendTask(self, master_ip, master_port, task_id, md5, ranges, wildcard, symbolrange):
+        url = "http://%s:%s/checkmd5" %(self.ip_address, self.port)
+        params = {"ip": master_ip, "port": master_port,\
+                "id": task_id, "md5": md5, "ranges": ranges,\
+                "wildcard": wildcard, "symbolrange": symbolrange}
+        data = json.dumps(params)
+        req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
+        response_stream = urllib2.urlopen(req)
+        response_stream.close()
 
     def prepareResourceRequestUrl(self, sendip, sendport, ttl, task_id, noask):
         base_url = "http://%s:%s/resource" %(self.ip_address, self.port)
@@ -20,8 +28,6 @@ class Computer(object):
         url = base_url + "?" + url_params
         return url
 
-    def sendCrackTask(self, CrackTask):
-        pass
 
     def replyWithProcessedCrackTask(self, CrackTask):
         pass
@@ -29,7 +35,7 @@ class Computer(object):
     def sendResourceRequest(self, sendip, sendport, ttl, task_id, noask):
         url = self.prepareResourceRequestUrl(sendip, sendport, ttl, task_id, noask)
         print url
-        print "i get stuck here"
+        #print "i get stuck here"
         try:
             response = urllib2.urlopen(url)
         except urllib2.URLError, e:
@@ -37,9 +43,9 @@ class Computer(object):
         except:
             raise
 
-        print "opened the url"
+        print "urlopen() successful"
         response.close()  # best practice to close the file
-        print "closed the response"
+        print "response.close() successful"
 
     def __str__(self):
         return "my ip is: %s, port: %s" %(self.ip_address, self.port)

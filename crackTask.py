@@ -1,5 +1,6 @@
 from computer import Computer
 from slaveComputer import SlaveComputer
+import threading
 
 class CrackTask:
     def __init__(self, master_computer, md5):
@@ -21,18 +22,26 @@ class CrackTask:
         #initialize symbolrange
 
         length_limit = 5
-        self.divided_ranges = self.MD5IntoRanges(slave_count, length_limit)
-        print self.divided_ranges
+        self.divided_ranges = self.MD5IntoDividedRanges(slave_count, length_limit)
+        # print self.divided_ranges
 
         # send out the crack_task parts to the computers
         # slaveComputers receive and start cracking on a separate thread
-        self.md5Crack(self.md5, "template")
-        pass
+        self.sendTasks()
 
-    def md5Crack(self, md5, template):
-        pass
+    def sendTasks(self):
+        for ip_port in self.divided_ranges.keys():
+            self.slave_computers[ip_port].sendTask(
+                    self.master_computer.ip_address,
+                    self.master_computer.port,
+                    self.task_id,
+                    self.md5,
+                    self.divided_ranges[ip_port],
+                    self.wildcard,
+                    self.symbolrange
+                    )
 
-    def MD5IntoRanges(self, slave_count, length_limit):
+    def MD5IntoDividedRanges(self, slave_count, length_limit):
         symbols_count = self.countSymbolRange()
 
         # total_search_space = 0

@@ -1,1 +1,0 @@
-["POST", "/resourcereply", {"ip": "su", "resource": "5", "port": "ema", "id": "n00b"}]
