@@ -21,25 +21,25 @@ class CrackTask:
         #initialize wildcard
         #initialize symbolrange
 
-        length_limit = 5
+        length_limit = 4
         self.divided_ranges = self.MD5IntoDividedRanges(slave_count, length_limit)
         # print self.divided_ranges
 
         # send out the crack_task parts to the computers
-        # slaveComputers receive and start cracking on a separate thread
         self.sendTasks()
+        # slaveComputers receive and start cracking on a separate thread
 
     def sendTasks(self):
         for ip_port in self.divided_ranges.keys():
             self.slave_computers[ip_port].sendTask(
-                    self.master_computer.ip_address,
-                    self.master_computer.port,
-                    self.task_id,
-                    self.md5,
-                    self.divided_ranges[ip_port],
-                    self.wildcard,
-                    self.symbolrange
-                    )
+                self.master_computer.ip_address,
+                self.master_computer.port,
+                self.task_id,
+                self.md5,
+                self.divided_ranges[ip_port],
+                self.wildcard,
+                self.symbolrange
+                )
 
     def MD5IntoDividedRanges(self, slave_count, length_limit):
         symbols_count = self.countSymbolRange()

@@ -1,6 +1,7 @@
 from computer import Computer
 from slaveComputer import SlaveComputer
 from crackTask import CrackTask
+import hashlib
 
 class Action():
 
@@ -78,7 +79,59 @@ class Action():
 
 
     def checkmd5(self, server, params):
-        pass
+        print "inside checkmd5()"
+        master_ip = params['ip']
+        master_port = str(params['port'])
+        task_id = params['id']
+        md5 = params['md5']
+        ranges = params['ranges']
+        try:
+            wildcard = params['wildcard']
+        except:
+            wildcard = "?"
+        try:
+            symbolrange = params['symbolrange']
+        except:
+            symbolrange = [[32,126]]
+
+        print "params initiated as variables"
+        for template in ranges:
+            result = self.md5solver(md5, template, wildcard)
+            if result:
+                print("cracking "+ md5 +" with template" + template + " gave " + result)
+            else:
+                print("failed to crack " + md5 + " with template " + template)
+
+    def md5solver(self, hexhash, template, wildcard):
+        #"instantiate template and crack all instatiations"
+        # first block recursively instantiates template
+        i=0
+        found=False
+        while i<len(template):
+            if template[i]==wildcard:
+                found=True
+                char=32 # start with this char ascii
+                while char<126:
+                    c=chr(char)
+                    if c!=wildcard: # cannot check wildcard!
+                        ntemplate=template[:i]+c+template[i+1:]
+                        print("i: "+str(i)+" ntemplate: "+ntemplate)
+                        res=self.md5solver(hexhash,ntemplate, wildcard)
+                        if res: # stop immediately if cracked
+                            return res
+                    char+=1
+            i+=1
+        # instantiation loop done
+        if not found:
+            # no wildcards found in template: crack
+            m = hashlib.md5()
+            m.update(template)
+            h4sh = m.hexdigest()
+            #print("template: "+template+" hash: "+hash)
+            if h4sh == hexhash:
+                return template # cracked!
+        # template contains wildcards
+        return None
 
     def answermd5(self, server, params):
         pass

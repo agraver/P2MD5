@@ -121,8 +121,7 @@ class Server:
         if method == "POST":
             # Slave -> Master
             if command == "/resourcereply":
-                self.handle.resourcereply(self, params)
-
+                self.handle.resourcereply(self, params)                
             # Master -> Slave
             if command == "/checkmd5":
                 self.handle.checkmd5(self, params)
@@ -242,7 +241,7 @@ class Server:
             # Its a json string inside the list
             posted_data_string = lines[-1:][0]
             params = json.loads(posted_data_string)
-            print "Parsed data is ", params
+            # print "Parsed data is ", params
         return method, command, params
 
     def parsePath(self, path):
