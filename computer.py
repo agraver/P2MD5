@@ -28,10 +28,6 @@ class Computer(object):
         url = base_url + "?" + url_params
         return url
 
-
-    def replyWithProcessedCrackTask(self, CrackTask):
-        pass
-
     def sendResourceRequest(self, sendip, sendport, ttl, task_id, noask):
         url = self.prepareResourceRequestUrl(sendip, sendport, ttl, task_id, noask)
         print url

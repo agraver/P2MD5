@@ -18,9 +18,6 @@ class CrackTask:
         slave_count = self.countSlaves()
         # divide the cracktask accordingly, compose all the strings
 
-        #initialize wildcard
-        #initialize symbolrange
-
         length_limit = 4
         self.divided_ranges = self.MD5IntoDividedRanges(slave_count, length_limit)
         # print self.divided_ranges
@@ -59,6 +56,9 @@ class CrackTask:
             partial_symbol_range = map((lambda x: chr(x)), (range(r[0], r[1]+1)))
             explicit_symbol_range += partial_symbol_range
 
+        #Exclude wildcard as it creates an unwanted template full of wildcards
+        explicit_symbol_range.remove(self.wildcard)
+
         def chunkIt(seq, num):
             avg = len(seq) / float(num)
             out = []
@@ -77,12 +77,13 @@ class CrackTask:
         for i in range(1, length_limit):
             lesser_range.append(self.wildcard * i)
 
+
         wide_ranges = []
         for r in pre_result:
             w_range = map((lambda x: self.wildcard*(length_limit-1) + x), r)
             wide_ranges.append(w_range)
 
-        wide_ranges[0] += lesser_range
+        wide_ranges[0] = lesser_range + wide_ranges[0]
 
         i = 0
         divided_ranges = {}

@@ -121,7 +121,7 @@ class Server:
         if method == "POST":
             # Slave -> Master
             if command == "/resourcereply":
-                self.handle.resourcereply(self, params)                
+                self.handle.resourcereply(self, params)
             # Master -> Slave
             if command == "/checkmd5":
                 self.handle.checkmd5(self, params)
@@ -203,6 +203,17 @@ class Server:
     def masterCrackTaskProcess(self, crackTask):
         print "inside masterCrackTaskProcess()"
         crackTask.solve()
+
+    def sendMd5Answer(self, master_ip, master_port, task_id, md5, result, resultstring):
+        ip_address = self.ip_address
+        port = self.port
+        url = "http://%s:%s/answermd5" %(master_ip, master_port)
+        data = json.dumps({"ip":ip_address, "port":port, "id":task_id,\
+                        "md5":md5, "result":result, "resultstring":resultstring})
+
+        req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
+        response_stream = urllib2.urlopen(req)
+        response_stream.close()
 
     def printCrackTask(self, task_id):
         crack_task = self.crack_tasks[task_id]

@@ -2,6 +2,7 @@ from computer import Computer
 from slaveComputer import SlaveComputer
 from crackTask import CrackTask
 import hashlib
+import time
 
 class Action():
 
@@ -93,34 +94,56 @@ class Action():
             symbolrange = params['symbolrange']
         except:
             symbolrange = [[32,126]]
-
         print "params initiated as variables"
+
+
+        self.timeout = 10
+        self.start_time = time.time()
+        result = 1 # not found code
+
         for template in ranges:
-            result = self.md5solver(md5, template, wildcard)
-            if result:
-                print("cracking "+ md5 +" with template" + template + " gave " + result)
-            else:
+            status, result_string = self.md5solver(md5, template, wildcard)
+
+            if status == 0:
+                print("cracking "+ md5 +" with template" + template + " gave " + result_string)
+                break
+            elif status == 1:
                 print("failed to crack " + md5 + " with template " + template)
+                continue
+            elif status == 2:
+                print "timed out"
+                break
+
+        server.sendMd5Answer(master_ip, master_port, task_id, md5, status, result_string)
+
 
     def md5solver(self, hexhash, template, wildcard):
-        #"instantiate template and crack all instatiations"
+        # instantiate template and crack all instatiations
         # first block recursively instantiates template
-        i=0
-        found=False
-        while i<len(template):
-            if template[i]==wildcard:
-                found=True
-                char=32 # start with this char ascii
-                while char<126:
-                    c=chr(char)
-                    if c!=wildcard: # cannot check wildcard!
-                        ntemplate=template[:i]+c+template[i+1:]
-                        print("i: "+str(i)+" ntemplate: "+ntemplate)
-                        res=self.md5solver(hexhash,ntemplate, wildcard)
-                        if res: # stop immediately if cracked
-                            return res
-                    char+=1
-            i+=1
+        i = 0
+        found = False
+        while i < len(template):
+            if template[i] == wildcard:
+                found = True
+                char = 32 # start with this char ascii
+                while char < 126:
+                    c = chr(char)
+                    if c != wildcard: # cannot check wildcard!
+
+                        ntemplate = template[:i] + c + template[i+1:]
+                        status, result_string = self.md5solver(hexhash, ntemplate, wildcard)
+
+                        if status in [0,2]:
+                            return status, result_string
+
+                    char += 1
+            i += 1
+
+        # timeout scenario
+        if (time.time() - self.start_time > self.timeout):
+            print "Timed Out Bruh"
+            return 2, None
+
         # instantiation loop done
         if not found:
             # no wildcards found in template: crack
@@ -129,11 +152,13 @@ class Action():
             h4sh = m.hexdigest()
             #print("template: "+template+" hash: "+hash)
             if h4sh == hexhash:
-                return template # cracked!
-        # template contains wildcards
-        return None
+                return 0, template # cracked!
+        return 1, None
 
     def answermd5(self, server, params):
+        # what should the server do once it has the answer?
+        # probably mark the result inside the crackTask
+        # print out the result
         pass
 
     def crack(self, server, params):
