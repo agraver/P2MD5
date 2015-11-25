@@ -218,21 +218,25 @@ class Action():
         elif result == 2:
             print "Master is processing the Timed Out case"
             crack_task.failed_templates += failed_templates
-            print failed_templates
             # Think about this one...
 
         def recalculate():
             print "I am the recalculator"
             print crack_task.failed_templates
-            pass
+            #reset time in crackTask
+            crack_task.startTime = time.time()
+            #reset crackTask's slave omputers
+            crack_task.slave_computers = {}
+            crack_task.answered_computers = set()
+            #send new resource queries
+            server.sendMasterResourceRequest(5, crack_task.task_id)
+            #divide the ranges again
+            #TODO see other sendMasterReosurceRequest, deepcopy etc.
+            return
 
-        #TODO perform checks inside crackTask if all responses have been received
-        #TODO perform checks inside crackTask if timeout has been reached
         if crack_task.everyoneResponded() or crack_task.timedOut():
             if not crack_task.solved:
                 recalculate()
-        #TODO recalculation case
-
 
     def crack(self, server, params):
         md5 = params["md5"][0]
