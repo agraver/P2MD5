@@ -63,43 +63,35 @@ class CrackTask:
         #Exclude wildcard as it creates an unwanted template full of wildcards
         explicit_symbol_range.remove(self.wildcard)
 
+        lesser_range = []
+        for i in range(1, length_limit):
+            template = self.wildcard * i
+            lesser_range.append(template)
+
+        wider_range = map((lambda x: self.wildcard*(length_limit-1) + x), explicit_symbol_range)
+
+        whole_range = lesser_range + wider_range
+
+        for template in whole_range:
+            if template in self.failed_templates:
+                whole_range.remove(template)
+
         def chunkIt(seq, num):
             avg = len(seq) / float(num)
             out = []
             last = 0.0
-
             while last < len(seq):
                 out.append(seq[int(last):int(last + avg)])
                 last += avg
-
             return out
 
         print "slave_count: " + str(slave_count)
-        pre_result = list(chunkIt(explicit_symbol_range, slave_count))
-
-        lesser_range = []
-        for i in range(1, length_limit):
-            template = self.wildcard * i
-            #hack for recalculation case
-            if template not in self.failed_templates:
-                lesser_range.append(template)
-
-
-        wide_ranges = []
-        for r in pre_result:
-            w_range = map((lambda x: self.wildcard*(length_limit-1) + x), r)
-            #hack for recalculation case
-            for template in w_range:
-                if template in self.failed_templates:
-                    w_range.remove(template)
-            wide_ranges.append(w_range)
-
-        wide_ranges[0] = lesser_range + wide_ranges[0]
+        pre_result = list(chunkIt(whole_range, slave_count))
 
         i = 0
         divided_ranges = {}
         for slave_key in self.slave_computers.keys():
-            divided_ranges[slave_key] = wide_ranges[i]
+            divided_ranges[slave_key] = pre_result[i]
             i += 1
 
         return divided_ranges
