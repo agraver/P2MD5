@@ -1,8 +1,10 @@
 from computer import Computer
 from slaveComputer import SlaveComputer
 from crackTask import CrackTask
+import threading
 import hashlib
 import time
+import copy
 
 class Action():
 
@@ -43,10 +45,14 @@ class Action():
 
         print "sendip:", sendip, "sendport:", sendport, "task_id:", task_id, "resource:", resource
 
-        # Send out /resourcereply only if we haven't done so in the past
-        if task_id not in server.responded_task_ids:
+        # Send out /resourcereply only if we haven't done so yet
+        if task_id not in server.resource_responded_task_ids:
             server.sendResourceReply(sendip, sendport, task_id, resource)
-            server.responded_task_ids.add(task_id)
+            server.resource_responded_task_ids.add(task_id)
+        # TODO but remove the task_id from the set once we have tried to solve it
+        # in order to be able to reply for resources
+        # when another part from the same task is attempted to be solved again
+        # say.. due to timeouts or unsolved tasks from slaves that died in the process.
 
         # Next step would be sending out requests to all the machines
         # that I, myself, as a Server, know from "machines.txt" file.
@@ -63,20 +69,24 @@ class Action():
         task_id = params['id']
         computer_address = "%s_%s" % (ip, port)
 
-        # If this is a new computer instance to us.
-        if computer_address not in server.responded_computers:
+        if task_id not in server.crack_tasks.keys():
+            # we're getting a resourcereply to a CrackTask we haven't spawn
+            pass
+
+        crack_task = server.crack_tasks[task_id]
+        # a new computer instance for the given crackTask
+        if computer_address not in crack_task.slave_computers.keys():
             # We create a MD5 computing slave_computer
             computer = Computer(ip, port)
             slave_computer = SlaveComputer(computer, resource)
-
-            if task_id not in server.crack_tasks.keys():
-                pass
-
-            crack_task = server.crack_tasks[task_id]
             crack_task.addSlave(slave_computer)
             #update the crack_task object
             server.crack_tasks[task_id] = crack_task
-            #print crack_task
+        else:
+            # we already received a response from this computer for this crackTask
+            # if it's a repeated calculation, the program shouldn't
+            # get here, since it would reply the answer right away and not ask for resources
+            pass
 
 
     def checkmd5(self, server, params):
@@ -96,10 +106,16 @@ class Action():
             symbolrange = [[32,126]]
         print "params initiated as variables"
 
+        # while calculating set the server's resource as unavailable
+        server.resource['available'] = False
+        print "Slave is now busy calculating..."
 
-        self.timeout = 10
+        self.timeout = 30
+        print "solver timeout is set to %i" %(self.timeout)
         self.start_time = time.time()
         result = 1 # not found code
+
+        failed_templates = []
 
         for template in ranges:
             status, result_string = self.md5solver(md5, template, wildcard)
@@ -109,12 +125,19 @@ class Action():
                 break
             elif status == 1:
                 print("failed to crack " + md5 + " with template " + template)
+                failed_templates.append(template)
                 continue
             elif status == 2:
-                print "timed out"
+                print "solver timed out"
                 break
 
+        # TODO pass failed templates along with the answer for possible recalculation
         server.sendMd5Answer(master_ip, master_port, task_id, md5, status, result_string)
+        print "Answer for the resulting cracking attempt has been sent out"
+        server.resource_responded_task_ids.discard(task_id)
+        print "the task_id is removed from resource_responded_task_ids"
+        server.resource['available'] = True
+        print "Slave is once again ready for work"
 
 
     def md5solver(self, hexhash, template, wildcard):
@@ -141,7 +164,6 @@ class Action():
 
         # timeout scenario
         if (time.time() - self.start_time > self.timeout):
-            print "Timed Out Bruh"
             return 2, None
 
         # instantiation loop done
@@ -149,17 +171,94 @@ class Action():
             # no wildcards found in template: crack
             m = hashlib.md5()
             m.update(template)
-            h4sh = m.hexdigest()
-            #print("template: "+template+" hash: "+hash)
+            h4sh = m.hexdigest() # hash is a built-in function name
+            #print("template: "+template+" hash: "+h4sh)
             if h4sh == hexhash:
                 return 0, template # cracked!
         return 1, None
 
     def answermd5(self, server, params):
-        # what should the server do once it has the answer?
-        # probably mark the result inside the crackTask
+        # answermd5:[ip, port, id, md5, result, resultstring]
+        # what should the Master Server do once it receives replies about crack?
         # print out the result
-        pass
+        from_ip = params['ip']
+        from_port = str(params['port'])
+        task_id = params['id']
+        md5 = params['md5']
+        result = params['result']
+        resultstring = params['resultstring']
+        from_address = '%s_%s' %(from_ip, from_port)
+
+        if task_id not in server.crack_tasks.keys():
+            # we're getting an answer to a CrackTask we haven't spawn
+            pass
+
+        crack_task = server.crack_tasks[task_id]
+
+        if result == 0:
+            print "Master is processing the Result Found case"
+            crack_task.solved = True
+            crack_task.answer = resultstring
+            print "next I'm sending the resultstring to server.connection"
+            response = '<p> Result of the calculation is: %s\n' %(resultstring)
+            server.connection.send(response)
+            server.connection.send('</body></html>\n\n')
+            print "closing server.connection"
+            server.connection.close()
+            server.connection = None
+
+        elif result == 1:
+            print "Master is processing the Result Not Found case"
+            # Add ranges to the ones that have already been looked through
+            crack_task.failed_templates += crack_task.divided_ranges[from_address]
+
+        elif result == 2:
+            print "Master is processing the Timed Out case"
+            # Think about this one...
+
+
 
     def crack(self, server, params):
-        server.startCracking(params["md5"][0])
+        md5 = params["md5"][0]
+
+        crack_task = CrackTask(server.myselfAsComputer, md5)
+        task_id = crack_task.task_id
+
+        if task_id in server.crack_tasks.keys():
+            crack_task = server.crack_tasks[task_id]
+            if crack_task.solved:
+                # Give the answer right away
+                print "the task is already solved"
+                resultstring = crack_task.answer
+                response = '<p> Oh! I already have the answer. It is: %s\n' %(resultstring)
+                server.connection.send(response)
+                server.connection.send('</body></html>\n\n')
+                print "closing server.connection"
+                server.connection.close()
+                server.connection = None
+                return
+            else:
+                print "the task is in the process of being solved"
+                response = '<p> this md5 is currently being solved, try to refresh the page again later for results\n'
+                server.connection.send(response)
+                server.connection.send('</body></html>\n\n')
+                print "closing server.connection"
+                server.connection.close()
+                server.connection = None
+                return
+
+        server.crack_tasks[task_id] = crack_task
+
+        ttl = 5
+        server.sendMasterResourceRequest(ttl, task_id)
+        print "self.sendMasterResourceRequest(ttl, task_id) successful"
+
+        t = threading.Timer(5, server.printCrackTask, args=(task_id,))
+        t.start()
+        t.join() # wait until finished
+
+        task_deepcopy = copy.deepcopy(crack_task)
+        print "made the deepcopy"
+
+        t = threading.Thread(target=server.masterCrackTaskProcess, args=(task_deepcopy,))
+        t.start()

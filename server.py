@@ -18,15 +18,14 @@ class Server:
         self.ip_address = '127.0.0.1'
         self.port = port
         self.sock = None
-        self.resource = {"available": True, "amount": 100} #TODO
-        self.myself = Computer(self.ip_address, self.port)
+        self.resource = {"available": True, "amount": 100}
+        self.myselfAsComputer = Computer(self.ip_address, self.port)
         self.known_computers = {} # {'<ip>_<port>':<Computer>}
         self.crack_tasks = {} # {'crack_task_id':<CrackTask>}
 
-        # Set of task ids, which I have already sent a resourcereply
-        self.responded_task_ids = set()  # {'<task_id>'}
-        self.responded_computers = set() # {'<ip>_<port>'}
+        self.connection = None
 
+        self.resource_responded_task_ids = set()  # {'<task_id>'}
         # Commands: resource[GET], resourcereply[POST], checkmd5[POST], answermd5[POST], crack[GET]
         # Action handlers. Usage: self.handle.<command>(params)
         self.handle = Action()
@@ -67,24 +66,48 @@ class Server:
         self.address = (self.ip_address, self.port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        #self.sock.settimeout(1) #just times out in a second after opening the socket
         self.sock.bind(self.address)
         return None
 
     def listen(self):
         self.sock.listen(10)
         while True:
-            print >>sys.stderr, 'waiting for a connection'
+            print 'waiting for a connection'
             connection, client_address = self.sock.accept()
             try:
-                print >>sys.stderr, 'connection from', client_address
-                request_header = ""
-                data = connection.recv(4096)
-                request_header += data
-                connection.sendall(data)
-                connection.close()
-                parse_result = self.parseRequestHeader(request_header)
-                print >>sys.stderr, '>>> Header parse_result (same as query_data) >>>', parse_result
+                print 'connection from', client_address
+                request = connection.recv(32768)
+
+                parse_result = self.parseRequestHeader(request)
+                print 'parse_result >>>', parse_result
+                method, command, params = parse_result
+
+                if command == "/crack":
+                    print "dealing with a browser client"
+                    connection.send('HTTP/1.1 200 OK\n')
+                    connection.send('Content-Type: text/html; encoding=utf8\n')
+                    #TODO maybe add a time-out header
+                    connection.send('Connection: keep-alive\n')
+                    connection.send('\n') # to separate headers from body
+                    connection.send('<html><body>')
+                    connection.send('<h1>Hello, %s:%i!</h1>' %(client_address))
+                    connection.send('<h2>Requested MD5: %s</h2>' %(params['md5'][0]))
+                    connection.send('\n\n')
+
+                    if not self.connection:
+                        self.connection = connection
+                        print "created self.connection"
+                    else:
+                        print "Master server is busy atm"
+                        connection.send('<p> This server is already busy with another thread. Try again later.\n')
+                        connection.close()
+                        continue
+
+                else:
+                    print "dealing with inside requests"
+                    connection.send("OK")
+                    connection.close()
+
                 t = threading.Thread(target=self.handleRequest, args=(parse_result,))
                 t.start()
             except:
@@ -95,37 +118,23 @@ class Server:
     def handleRequest(self, query_data):
         method, command, params = query_data
         print "inside handleRequest() thread version"
-        ## methods: GET, POST
-        ## commands: resource[GET], resourcereply[POST], checkmd5[POST], answermd5[POST], crack[GET]
-        ## params:
-        ##    resource:[sendip,sendport,ttl,id,noask]
-        ##    resourcereply:[ip, port, id, resource=100]
-        ##    checkmd5:[ip, port, id, md5, ranges, wildcard, symbolrange]
-        ##        ranges: ["ax?o?ssss","aa","ab","ac","ad"]
-        ##        wildcard: "?"
-        ##        symbolrange: [[3,10],[100,150]]
-        ##    answermd5:[ip, port, id, md5, result, resultString]
-        ##        result: 0 - Success, 1 - String not Found, 2 - Didn't have enough time
-        ##        resultString: saosdooe
-        ##    crack:[md5]
 
         if method == "GET":
-            print "GET branch"
-            # Master -> Slave
+            # SLAVE receives from MASTER
             if command == "/resource":
                 self.handle.resource(self, params)
-            # Master -> Slave
+            # MASTER receives from USER
             if command == "/crack":
                 self.handle.crack(self, params)
 
         if method == "POST":
-            # Slave -> Master
+            # MASTER receives from SLAVE
             if command == "/resourcereply":
                 self.handle.resourcereply(self, params)
-            # Master -> Slave
+            # SLAVE receives from MASTER
             if command == "/checkmd5":
                 self.handle.checkmd5(self, params)
-            # Slave -> Master
+            # MASTER receives from SLAVE
             if command == "/answermd5":
                 self.handle.answermd5(self, params)
 
@@ -182,23 +191,6 @@ class Server:
             print self.ip_address+" sent ResourceRequest to " + computer.ip_address + ":" + computer.port
         print "sendResourceRequestToOthers() is complete"
 
-    def startCracking(self, md5):
-        task = CrackTask(self.myself, md5) #adding myself as the master computer to respond to through class methods.
-        task_id = task.task_id
-        self.crack_tasks[task_id] = task
-
-        ttl = 5
-        self.sendMasterResourceRequest(ttl, task_id)
-        print "self.sendMasterResourceRequest(ttl, task_id) successful"
-
-        t = threading.Timer(5, self.printCrackTask, args=(task_id,))
-        t.start()
-        t.join() # wait until finished
-
-        task_deepcopy = copy.deepcopy(task)
-        print "made the deepcopy"
-        t = threading.Thread(target=self.masterCrackTaskProcess, args=(task_deepcopy,))
-        t.start()
 
     def masterCrackTaskProcess(self, crackTask):
         print "inside masterCrackTaskProcess()"

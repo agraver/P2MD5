@@ -12,14 +12,18 @@ class CrackTask:
         self.symbolrange = [[32,126]] # i.e [[1,10],[95,100]]
         self.master_computer = master_computer
         self.slave_computers = {} # {'<ip_port>':<SlaveComputer>}
+        self.LENGTH_LIMIT = 4 # max length of the word that we're going to bruteforce
+        self.solved = False
+        self.failed_templates = []
+
+        #TODO address the unsolvable case where the answer lies outside the lenght_limit
+        # such that we've looked through all the ranges and haven't found the answer
 
     def solve(self):
         print "inside main solving function of CrackTask"
         slave_count = self.countSlaves()
         # divide the cracktask accordingly, compose all the strings
-
-        length_limit = 4
-        self.divided_ranges = self.MD5IntoDividedRanges(slave_count, length_limit)
+        self.divided_ranges = self.MD5IntoDividedRanges(slave_count, self.LENGTH_LIMIT)
         # print self.divided_ranges
 
         # send out the crack_task parts to the computers
@@ -75,12 +79,19 @@ class CrackTask:
 
         lesser_range = []
         for i in range(1, length_limit):
-            lesser_range.append(self.wildcard * i)
+            template = self.wildcard * i
+            #hack for recalculation case
+            if template not in self.failed_templates:
+                lesser_range.append(template)
 
 
         wide_ranges = []
         for r in pre_result:
             w_range = map((lambda x: self.wildcard*(length_limit-1) + x), r)
+            #hack for recalculation case
+            for template in w_range:
+                if template in self.failed_templates:
+                    w_range.remove(template)
             wide_ranges.append(w_range)
 
         wide_ranges[0] = lesser_range + wide_ranges[0]
@@ -104,30 +115,27 @@ class CrackTask:
         return len(self.slave_computers.keys())
 
     def generateId(self, md5):
-        #assume md5 is a string
-        #TODO generate a more unique md5 identificator
-        return md5[:5] + "420"
+        #TODO maybe think of a shorter way to represent a md5 uniquely
+        # yet consistently across other servers that may generate it
+        return md5
 
     def getSlaveKey(self, computer):
         ip = computer.ip_address
         port = computer.port
         return "%s_%s" % (ip, port)
 
-    def splitBetweenSlaves(self,):
-        pass
-
     def hasSlave(self, computer):
         """
-            If CrackTask has computer stored in self.slave_computers
-            returns True/False
+        If CrackTask has computer stored in self.slave_computers
+        returns True/False
         """
         key = self.getSlaveKey(computer)
         return key in self.slave_computers.keys()
 
     def addSlave(self, computer):
         """
-            Add slave computer to self.slave_computers
-            returns None
+        Add slave computer to self.slave_computers
+        returns None
         """
         key = self.getSlaveKey(computer)
         self.slave_computers[key] = computer
