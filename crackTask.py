@@ -1,21 +1,25 @@
 from computer import Computer
 from slaveComputer import SlaveComputer
 import threading
+import time
 
 class CrackTask:
     def __init__(self, master_computer, md5):
         self.md5 = md5
         self.task_id = self.generateId(md5)
         self.answer = None
-        self.divided_ranges = None # ie {"<ip_port>":["?","??","???","????","????a"], "<ip_port>":["????b", "????c", "????d"],"<ip_port>": ["????d","????e","????f"],....}
+        self.divided_ranges = {} # ie {"<ip_port>":["?","??","???","????","????a"], "<ip_port>":["????b", "????c", "????d"],"<ip_port>": ["????d","????e","????f"],....}
         self.wildcard = "?" # ie "?"
         self.symbolrange = [[32,126]] # i.e [[1,10],[95,100]]
         self.master_computer = master_computer
         self.slave_computers = {} # {'<ip_port>':<SlaveComputer>}
-        self.LENGTH_LIMIT = 4 # max length of the word that we're going to bruteforce
         self.solved = False
         self.failed_templates = []
+        self.answered_computers = set() # {'<ip_port>'}
+        self.startTime = time.time()
 
+        self.LENGTH_LIMIT = 4 # max length of the word that we're going to bruteforce
+        self.TIMEOUT = 120
         #TODO address the unsolvable case where the answer lies outside the lenght_limit
         # such that we've looked through all the ranges and haven't found the answer
 
@@ -24,7 +28,7 @@ class CrackTask:
         slave_count = self.countSlaves()
         # divide the cracktask accordingly, compose all the strings
         self.divided_ranges = self.MD5IntoDividedRanges(slave_count, self.LENGTH_LIMIT)
-        # print self.divided_ranges
+        print self.divided_ranges
 
         # send out the crack_task parts to the computers
         self.sendTasks()
@@ -88,6 +92,9 @@ class CrackTask:
         print "slave_count: " + str(slave_count)
         pre_result = list(chunkIt(whole_range, slave_count))
 
+        # print "pre_result: ", pre_result
+        # print "slave_computers"
+
         i = 0
         divided_ranges = {}
         for slave_key in self.slave_computers.keys():
@@ -100,7 +107,7 @@ class CrackTask:
         symbolrange = self.symbolrange
         symbols_total = 0
         for r in symbolrange:
-            symbols_total = r[1] - r[0] + 1
+            symbols_total += r[1] - r[0] + 1
         return symbols_total
 
     def countSlaves(self):
@@ -131,6 +138,16 @@ class CrackTask:
         """
         key = self.getSlaveKey(computer)
         self.slave_computers[key] = computer
+
+    def everyoneResponded(self):
+        for ip_port in self.divided_ranges.keys():
+            if ip_port not in self.answered_computers:
+                return False
+        return True
+
+    def timedOut(self):
+        return (time.time() - self.startTime) > self.TIMEOUT
+
 
     def __str__(self):
         return 'CrackTask ' + self.task_id +' has slaves'+ str(self.slave_computers.values())

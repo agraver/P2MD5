@@ -196,12 +196,12 @@ class Server:
         print "inside masterCrackTaskProcess()"
         crackTask.solve()
 
-    def sendMd5Answer(self, master_ip, master_port, task_id, md5, result, resultstring):
+    def sendMd5Answer(self, master_ip, master_port, task_id, md5, result, resultstring, failed_templates):
         ip_address = self.ip_address
         port = self.port
         url = "http://%s:%s/answermd5" %(master_ip, master_port)
         data = json.dumps({"ip":ip_address, "port":port, "id":task_id,\
-                        "md5":md5, "result":result, "resultstring":resultstring})
+                        "md5":md5, "result":result, "resultstring":resultstring, "failed_templates":failed_templates})
 
         req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
         response_stream = urllib2.urlopen(req)

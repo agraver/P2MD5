@@ -132,7 +132,7 @@ class Action():
                 break
 
         # TODO pass failed templates along with the answer for possible recalculation
-        server.sendMd5Answer(master_ip, master_port, task_id, md5, status, result_string)
+        server.sendMd5Answer(master_ip, master_port, task_id, md5, status, result_string, failed_templates)
         print "Answer for the resulting cracking attempt has been sent out"
         server.resource_responded_task_ids.discard(task_id)
         print "the task_id is removed from resource_responded_task_ids"
@@ -187,6 +187,7 @@ class Action():
         md5 = params['md5']
         result = params['result']
         resultstring = params['resultstring']
+        failed_templates = params['failed_templates']
         from_address = '%s_%s' %(from_ip, from_port)
 
         if task_id not in server.crack_tasks.keys():
@@ -194,6 +195,7 @@ class Action():
             pass
 
         crack_task = server.crack_tasks[task_id]
+        crack_task.answered_computers.add(from_address)
 
         if result == 0:
             print "Master is processing the Result Found case"
@@ -206,6 +208,7 @@ class Action():
             print "closing server.connection"
             server.connection.close()
             server.connection = None
+            return
 
         elif result == 1:
             print "Master is processing the Result Not Found case"
@@ -214,8 +217,21 @@ class Action():
 
         elif result == 2:
             print "Master is processing the Timed Out case"
+            crack_task.failed_templates += failed_templates
+            print failed_templates
             # Think about this one...
 
+        def recalculate():
+            print "I am the recalculator"
+            print crack_task.failed_templates
+            pass
+
+        #TODO perform checks inside crackTask if all responses have been received
+        #TODO perform checks inside crackTask if timeout has been reached
+        if crack_task.everyoneResponded() or crack_task.timedOut():
+            if not crack_task.solved:
+                recalculate()
+        #TODO recalculation case
 
 
     def crack(self, server, params):
