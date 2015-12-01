@@ -4,7 +4,6 @@ from crackTask import CrackTask
 import threading
 import hashlib
 import time
-import copy
 
 class Action():
 
@@ -74,6 +73,10 @@ class Action():
             pass
 
         crack_task = server.crack_tasks[task_id]
+
+        if crack_task.locked:
+            pass
+
         # a new computer instance for the given crackTask
         if computer_address not in crack_task.slave_computers.keys():
             # We create a MD5 computing slave_computer
@@ -221,17 +224,32 @@ class Action():
             # Think about this one...
 
         def recalculate():
+            print "######################"
+            print "######################"
+            print "######################"
+            print "######################"
+            print "######################"
+            print "######################"
             print "I am the recalculator"
             print crack_task.failed_templates
             #reset time in crackTask
             crack_task.startTime = time.time()
+            crack_task.locked = False
             #reset crackTask's slave omputers
             crack_task.slave_computers = {}
             crack_task.answered_computers = set()
             #send new resource queries
             server.sendMasterResourceRequest(5, crack_task.task_id)
-            #divide the ranges again
-            #TODO see other sendMasterReosurceRequest, deepcopy etc.
+            print "self.sendMasterResourceRequest(ttl, task_id) successful"
+
+            t = threading.Timer(5, server.printCrackTask, args=(task_id,))
+            t.start()
+            t.join() # wait until finished
+
+            crack_task.locked = True
+
+            server.masterCrackTaskProcess(crack_task)
+
             return
 
         if crack_task.everyoneResponded() or crack_task.timedOut():
@@ -277,8 +295,7 @@ class Action():
         t.start()
         t.join() # wait until finished
 
-        task_deepcopy = copy.deepcopy(crack_task)
-        print "made the deepcopy"
+        crack_task.locked = True
 
-        t = threading.Thread(target=server.masterCrackTaskProcess, args=(task_deepcopy,))
+        t = threading.Thread(target=server.masterCrackTaskProcess, args=(crack_task,))
         t.start()

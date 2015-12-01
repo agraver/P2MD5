@@ -11,12 +11,16 @@ class CrackTask:
         self.divided_ranges = {} # ie {"<ip_port>":["?","??","???","????","????a"], "<ip_port>":["????b", "????c", "????d"],"<ip_port>": ["????d","????e","????f"],....}
         self.wildcard = "?" # ie "?"
         self.symbolrange = [[32,126]] # i.e [[1,10],[95,100]]
+
         self.master_computer = master_computer
         self.slave_computers = {} # {'<ip_port>':<SlaveComputer>}
-        self.solved = False
-        self.failed_templates = []
         self.answered_computers = set() # {'<ip_port>'}
+
+        self.failed_templates = []
+
         self.startTime = time.time()
+        self.solved = False
+        self.locked = False
 
         self.LENGTH_LIMIT = 4 # max length of the word that we're going to bruteforce
         self.TIMEOUT = 120
@@ -55,6 +59,11 @@ class CrackTask:
         #
         # search_space_per_slave = total_search_space / slave_count
 
+        if self.failed_templates:
+            print "printing out the failed_templates"
+            print self.failed_templates
+
+
         if (slave_count > symbols_count):
             print ":(((( we have to split the task smarter"
             return None
@@ -76,9 +85,10 @@ class CrackTask:
 
         whole_range = lesser_range + wider_range
 
-        for template in whole_range:
-            if template in self.failed_templates:
-                whole_range.remove(template)
+        # removing failed_templates
+        whole_range = list(set(self.failed_templates).symmetric_difference(whole_range))
+        # restoring sorted order so that ?, ??, ??? etc. are in front
+        whole_range.sort()
 
         def chunkIt(seq, num):
             avg = len(seq) / float(num)
