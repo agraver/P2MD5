@@ -113,7 +113,7 @@ class Action():
         server.resource['available'] = False
         print "Slave is now busy calculating..."
 
-        self.timeout = 30
+        self.timeout = 110
         print "solver timeout is set to %i" %(self.timeout)
         self.start_time = time.time()
         result = 1 # not found code
