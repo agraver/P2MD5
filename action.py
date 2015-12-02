@@ -264,7 +264,11 @@ class Action():
         t.join() # wait until finished
 
         crack_task.locked = True
-        crack_task.divideAndSendOut()
+        if crack_task.countSlaves() == 0:
+            response = '<p> No slaves found\n'
+            server.connection.send(response)
+            server.connection.send('</body></html>\n\n')
+            return 1
 
         while True:
             time.sleep(5) #seconds

@@ -94,6 +94,7 @@ class CrackTask:
         print "slave_count: " + str(slave_count)
         pre_result = list(chunkIt(whole_range, slave_count))
 
+
         i = 0
         divided_ranges = {}
         for slave_key in self.slave_computers.keys():
