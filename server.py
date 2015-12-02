@@ -42,25 +42,18 @@ class Server:
             machines = ast.literal_eval(machines)
             computers = [Computer(machine[0], machine[1]) for machine in machines]
             self.addComputers(computers)
-        finally:
-            pass
-        return None
+        except:
+            raise
+
 
     def addComputers(self, computers):
-        """
-        These are the computers known to this Server.
-        input:
-            computers - list of Computer objects [Computer1, Computer2, ...]
-        output:
-            None
-        """
         for computer in computers:
             ip = computer.ip_address
             port = computer.port
             key = "%s_%s" % (ip, port)
             if key not in self.known_computers.keys():
                 self.known_computers[key] = computer
-        return None
+
 
     def boot(self):
         self.address = (self.ip_address, self.port)
@@ -179,22 +172,22 @@ class Server:
             ttl = ttl - 1
 
         # Add senders computers ip to noask list, so there would be no duplicate requests to this machine
-        computer_address = "%s_%s" % (self.ip_address, self.port)
-        if computer_address not in noask:
-            noask.append(computer_address)
+        own_computer_address = "%s_%s" % (self.ip_address, self.port)
+        if own_computer_address not in noask:
+            noask.append(own_computer_address)
 
         for computer in self.known_computers.values():
+            print computer
             recepient_address = "%s_%s" % (computer.ip_address, computer.port)
             if recepient_address in noask:
                 continue
-            computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
+            try:
+                computer.sendResourceRequest(sendip, sendport, ttl, task_id, noask)
+            except:
+                continue
             print self.ip_address+" sent ResourceRequest to " + computer.ip_address + ":" + computer.port
         print "sendResourceRequestToOthers() is complete"
 
-
-    def masterCrackTaskProcess(self, crackTask):
-        print "inside masterCrackTaskProcess()"
-        crackTask.solve()
 
     def sendMd5Answer(self, master_ip, master_port, task_id, md5, result, resultstring, failed_templates):
         ip_address = self.ip_address

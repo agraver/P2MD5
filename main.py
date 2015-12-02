@@ -7,7 +7,6 @@ def main():
 
     if arg_count == 2:
         machine = Server(int(sys.argv[1]))
-        machine.addComputersFromMachinesTxt()
         machine.boot()
         machine.listen()
 

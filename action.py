@@ -55,7 +55,7 @@ class Action():
 
         # Next step would be sending out requests to all the machines
         # that I, myself, as a Server, know from "machines.txt" file.
-        if ttl > 0:
+        if ttl > 1:
             print "Sending out requests to minions"
             server.sendResourceRequestToOthers(task_id, sendip, sendport, ttl, noask)
         else:
@@ -223,38 +223,6 @@ class Action():
             crack_task.failed_templates += failed_templates
             # Think about this one...
 
-        def recalculate():
-            print "######################"
-            print "######################"
-            print "######################"
-            print "######################"
-            print "######################"
-            print "######################"
-            print "I am the recalculator"
-            print crack_task.failed_templates
-            #reset time in crackTask
-            crack_task.startTime = time.time()
-            crack_task.locked = False
-            #reset crackTask's slave omputers
-            crack_task.slave_computers = {}
-            crack_task.answered_computers = set()
-            #send new resource queries
-            server.sendMasterResourceRequest(5, crack_task.task_id)
-            print "self.sendMasterResourceRequest(ttl, task_id) successful"
-
-            t = threading.Timer(5, server.printCrackTask, args=(task_id,))
-            t.start()
-            t.join() # wait until finished
-
-            crack_task.locked = True
-
-            server.masterCrackTaskProcess(crack_task)
-
-            return
-
-        if crack_task.everyoneResponded() or crack_task.timedOut():
-            if not crack_task.solved:
-                recalculate()
 
     def crack(self, server, params):
         md5 = params["md5"][0]
@@ -296,6 +264,23 @@ class Action():
         t.join() # wait until finished
 
         crack_task.locked = True
+        crack_task.divideAndSendOut()
 
-        t = threading.Thread(target=server.masterCrackTaskProcess, args=(crack_task,))
-        t.start()
+        while True:
+            time.sleep(5) #seconds
+            if crack_task.everyoneResponded() or crack_task.timedOut():
+                if not crack_task.solved:
+                    print "I am the recalculator"
+                    crack_task.startTime = time.time()
+                    crack_task.locked = False
+                    crack_task.slave_computers = {}
+                    crack_task.answered_computers = set()
+                    server.sendMasterResourceRequest(5, crack_task.task_id)
+                    print "self.sendMasterResourceRequest(ttl, task_id) successful"
+
+                    t = threading.Timer(5, server.printCrackTask, args=(task_id,))
+                    t.start()
+                    t.join() # wait until finished
+
+                    crack_task.locked = True
+                    crack_task.divideAndSendOut()

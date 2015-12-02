@@ -24,19 +24,17 @@ class CrackTask:
 
         self.LENGTH_LIMIT = 4 # max length of the word that we're going to bruteforce
         self.TIMEOUT = 120
+
         #TODO address the unsolvable case where the answer lies outside the lenght_limit
         # such that we've looked through all the ranges and haven't found the answer
 
-    def solve(self):
+    def divideAndSendOut(self):
         print "inside main solving function of CrackTask"
         slave_count = self.countSlaves()
-        # divide the cracktask accordingly, compose all the strings
         self.divided_ranges = self.MD5IntoDividedRanges(slave_count, self.LENGTH_LIMIT)
+        print "printing divided_ranges between slaveComputers"
         print self.divided_ranges
-
-        # send out the crack_task parts to the computers
         self.sendTasks()
-        # slaveComputers receive and start cracking on a separate thread
 
     def sendTasks(self):
         for ip_port in self.divided_ranges.keys():
@@ -52,12 +50,6 @@ class CrackTask:
 
     def MD5IntoDividedRanges(self, slave_count, length_limit):
         symbols_count = self.countSymbolRange()
-
-        # total_search_space = 0
-        # for i in range(length_limit+1):
-        #     total_search_space += symbols_count**i
-        #
-        # search_space_per_slave = total_search_space / slave_count
 
         if self.failed_templates:
             print "printing out the failed_templates"
@@ -102,9 +94,6 @@ class CrackTask:
         print "slave_count: " + str(slave_count)
         pre_result = list(chunkIt(whole_range, slave_count))
 
-        # print "pre_result: ", pre_result
-        # print "slave_computers"
-
         i = 0
         divided_ranges = {}
         for slave_key in self.slave_computers.keys():
@@ -124,8 +113,6 @@ class CrackTask:
         return len(self.slave_computers.keys())
 
     def generateId(self, md5):
-        #TODO maybe think of a shorter way to represent a md5 uniquely
-        # yet consistently across other servers that may generate it
         return md5
 
     def getSlaveKey(self, computer):
@@ -134,18 +121,10 @@ class CrackTask:
         return "%s_%s" % (ip, port)
 
     def hasSlave(self, computer):
-        """
-        If CrackTask has computer stored in self.slave_computers
-        returns True/False
-        """
         key = self.getSlaveKey(computer)
         return key in self.slave_computers.keys()
 
     def addSlave(self, computer):
-        """
-        Add slave computer to self.slave_computers
-        returns None
-        """
         key = self.getSlaveKey(computer)
         self.slave_computers[key] = computer
 
@@ -157,7 +136,6 @@ class CrackTask:
 
     def timedOut(self):
         return (time.time() - self.startTime) > self.TIMEOUT
-
 
     def __str__(self):
         return 'CrackTask ' + self.task_id +' has slaves'+ str(self.slave_computers.values())

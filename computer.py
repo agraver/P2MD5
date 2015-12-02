@@ -18,7 +18,7 @@ class Computer(object):
                 "wildcard": wildcard, "symbolrange": symbolrange}
         data = json.dumps(params)
         req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
-        response_stream = urllib2.urlopen(req)
+        response_stream = urllib2.urlopen(req, timeout=1)
         response_stream.close()
 
     def prepareResourceRequestUrl(self, sendip, sendport, ttl, task_id, noask):
@@ -33,7 +33,7 @@ class Computer(object):
         print url
         #print "i get stuck here"
         try:
-            response = urllib2.urlopen(url)
+            response = urllib2.urlopen(url, timeout=1)
         except urllib2.URLError, e:
             raise
         except:
